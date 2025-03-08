@@ -49,14 +49,19 @@ extern "C" {
 
 /* USER CODE END EM */
 
+void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
+
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-
+void update_servo_position(int x, int y);
+void decodeData();
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define LOCK_Pin GPIO_PIN_2
+#define LOCK_GPIO_Port GPIOE
 #define CS_I2C_SPI_Pin GPIO_PIN_3
 #define CS_I2C_SPI_GPIO_Port GPIOE
 #define PC14_OSC32_IN_Pin GPIO_PIN_14

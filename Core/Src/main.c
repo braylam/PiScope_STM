@@ -35,9 +35,16 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+// Servo reset
+#define servoResetPosX 750
+#define servoResetPosY 800
+#define RESET_MAX 20
+
 // Servo pulse range
 #define SERVO_MIN_PULSE 250
 #define SERVO_MAX_PULSE 1250
+#define SERVO_MIN_PULSE_Y 400
+#define SERVO_MAX_PULSE_Y 1100
 
 // Camera frame dimensions
 #define FRAME_WIDTH 640
@@ -50,10 +57,10 @@
 
 // Lock timer
 #define MAX_LOCK_TIME 10000
-#define UNLOCK_COUNT 2
+#define UNLOCK_COUNT 6
 #define LOCKED 1
 #define UNLOCKED 0
-/* USER CODE END PD */
+/* USER CODE END PD *
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
@@ -108,7 +115,7 @@ int lock_start_time;
 int curr_time;
 int detect_start_time;
 int lock_state; // Locked == 1
-
+int reset_count;
 // Servo position data
 int x_int;
 int y_int;
@@ -156,14 +163,15 @@ int main(void)
   /* USER CODE BEGIN 2 */
     lock_count = 0;
     lock_state = 1;
+    reset_count = 0;
     lock_start_time = HAL_GetTick();
     detect_start_time = HAL_GetTick();
 	HAL_UART_Receive_DMA(&huart2, rx_buffer, 25);
   	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
     HAL_GPIO_WritePin(GPIOE, GPIO_PIN_2, lock_state);
-  	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 750);  // Midpoint for pan
-  	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 750);  // Midpoint for tilt
+  	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, servoResetPosY);  // Midpoint for pan
+  	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, servoResetPosX);  // Midpoint for tilt
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -181,9 +189,9 @@ int main(void)
 	curr_time = HAL_GetTick();
 	if(!lock_state) {
 		// lock if unlocked for more than MAX_LOCK_TIME
-		if (curr_time - lock_start_time > MAX_LOCK_TIME){
-		    lock_state = LOCKED;
-		}
+//		if (curr_time - lock_start_time > MAX_LOCK_TIME){
+//		    lock_state = LOCKED;
+//		}
 	} else {
 		if(curr_time - detect_start_time < MAX_LOCK_TIME){
 			if(lock_count == UNLOCK_COUNT) {
@@ -200,7 +208,7 @@ int main(void)
 	}
 
     HAL_GPIO_WritePin(GPIOE, GPIO_PIN_2, lock_state);
-	HAL_Delay(10);
+	HAL_Delay(50);
 
 	//Debug Serial printing
 //	if(uart_rx_done){
@@ -568,16 +576,33 @@ void update_servo_position(int x, int y) {
     int errorX = x - CENTER_X;
     int errorY = y - CENTER_Y;
 
-    servoPosX -= errorX / TRACKING_GAIN;
-    servoPosY -= errorY / TRACKING_GAIN;
+    if(abs(errorX) > 200) {
+        servoPosX -= errorX * 0.15;
+    } else if (abs(errorX) > 75) {
+        servoPosX -= errorX * 0.1;
+    }
+
+    if(abs(errorY) > 150) {
+    	servoPosY -= errorY * 0.05;
+    } else if (abs(errorY) > 50) {
+		servoPosY -= errorY * 0.1;
+	}
+
 
     if (servoPosX < SERVO_MIN_PULSE) servoPosX = SERVO_MIN_PULSE;
     if (servoPosX > SERVO_MAX_PULSE) servoPosX = SERVO_MAX_PULSE;
-    if (servoPosY < SERVO_MIN_PULSE) servoPosY = SERVO_MIN_PULSE;
-    if (servoPosY > SERVO_MAX_PULSE) servoPosY = SERVO_MAX_PULSE;
+    if (servoPosY < SERVO_MIN_PULSE_Y) servoPosY = SERVO_MIN_PULSE_Y;
+    if (servoPosY > SERVO_MAX_PULSE_Y) servoPosY = SERVO_MAX_PULSE_Y;
 
+    if(reset_count > RESET_MAX) {
+    	// set servos to neutral pos
+    	servoPosX = servoResetPosX;
+    	servoPosY = servoResetPosY;
+    	lock_state = LOCKED;
+    }
     __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, servoPosX);
     __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, servoPosY);
+
 }
 
 void HAL_UART_RxCpltCallback (UART_HandleTypeDef *huart) {
@@ -610,8 +635,13 @@ void decodeData(){
 	y_int = (int) y;
 	update_servo_position(x_int, y_int);
 
-	if(strcmp(old_name, name) == 0){
+	if(strcmp(old_name, name) == 0 && strcmp(old_name, "None") != 0) {
 		lock_count++;
+	}
+	if(strcmp(old_name, "None") == 0) {
+		reset_count++;
+	} else {
+		reset_count = 0;
 	}
 	if(lock_count == 1) {
 		detect_start_time = HAL_GetTick();

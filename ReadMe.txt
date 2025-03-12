@@ -1,4 +1,4 @@
-This is the C code for the STM32 in our PiScope capstone project. This code controls the servo motors tracking and also controls the unlocking logic for the solenoid.
+This is the C code for the STM32 in our SentriLock capstone project. This code controls the servo motors tracking and also controls the unlocking logic for the solenoid.
 
 The pin wiring is as follows:
 

@@ -1,4 +1,7 @@
+# SentriLock
 This is the C code for the STM32 in our SentriLock capstone project. This code controls the servo motors tracking and also controls the unlocking logic for the solenoid.
+
+Repo with the raspberry pi python code: https://github.com/rdate22/PiScope
 
 The pin wiring is as follows:
 
